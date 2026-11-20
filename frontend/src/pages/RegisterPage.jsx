@@ -119,7 +119,13 @@ const RegisterPage = () => {
             <input type="password" name="confirmPassword" className="form-control" minLength={10} maxLength={72} value={formData.confirmPassword} onChange={handleChange} required />
           </div>
 
-          <button className="btn btn-primary w-100" type="submit" disabled={loading}>
+          <button
+            className="btn btn-primary w-100"
+            type="submit"
+            disabled={loading || !emailVerified}
+            aria-disabled={!emailVerified}
+            title={!emailVerified ? 'Verify your email before registering' : undefined}
+          >
             {loading ? 'Creating account...' : 'Register'}
           </button>
 
