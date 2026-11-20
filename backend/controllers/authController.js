@@ -17,7 +17,11 @@ const {
 } = require("../utils/passwordPolicy");
 
 const isLocalEmailFallbackEnabled = () => process.env.NODE_ENV === "development";
-const isEmailConfigured = () => Boolean(process.env.EMAIL_HOST);
+const isEmailConfigured = () => Boolean(
+  process.env.EMAIL_HOST?.trim()
+  && process.env.EMAIL_USER?.trim()
+  && process.env.EMAIL_PASSWORD?.trim()
+);
 const passwordResetRequestMessage = "If an account exists for this email, a reset code has been sent.";
 
 const hashToken = (token) => {
@@ -126,11 +130,11 @@ const registerUser = async (req, res) => {
 
     const verificationUrl = await sendVerificationEmail(user);
 
-    return res.status(201).json({
+    return res.status(202).json({
       success: true,
       message: verificationUrl
-        ? "Account created. Verify your email using the local development link."
-        : "User registered successfully. Please check your email to verify your account.",
+        ? "Registration pending. Verify your email using the local development link to activate your account."
+        : "Registration pending. Please check your email to verify and activate your account.",
       data: {
         user: user.toJSON(),
         ...(verificationUrl && { verificationUrl })

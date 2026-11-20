@@ -622,11 +622,13 @@ const AdminDashboardPage = () => {
             <label className="form-label" htmlFor="pizza-image">Product picture</label>
             <input id="pizza-image" type="file" accept="image/*" className="visually-hidden"
               onChange={handlePizzaImageChange} disabled={uploadingImage} />
-            <label htmlFor="pizza-image" className="btn btn-outline-primary mb-2">
-              {uploadingImage ? 'Uploading image...' : 'Choose image'}
-            </label>
-            <div className="small text-muted text-truncate">
-              {imageFileName || (pizzaForm.image ? 'Current image selected' : 'No image selected')}
+            <div className="admin-image-upload">
+              <label htmlFor="pizza-image" className="btn btn-outline-primary">
+                {uploadingImage ? 'Uploading image...' : 'Choose image'}
+              </label>
+              <div className="small text-muted text-truncate">
+                {imageFileName || (pizzaForm.image ? 'Current image selected' : 'No image selected')}
+              </div>
             </div>
             <div className="form-text">Choose an image from your computer. Maximum size: 5 MB.</div>
             {pizzaForm.image && (

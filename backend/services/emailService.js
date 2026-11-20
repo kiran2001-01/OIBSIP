@@ -1,7 +1,9 @@
 const nodemailer = require("nodemailer");
 
 const sendEmail = async ({ to, subject, html }) => {
-  const emailHost = process.env.EMAIL_HOST;
+  const emailHost = process.env.EMAIL_HOST?.trim();
+  const emailUser = process.env.EMAIL_USER?.trim();
+  const emailPassword = process.env.EMAIL_PASSWORD?.replace(/\s/g, "");
 
   if (!emailHost) {
     console.log("Email service not configured. Skipping email send.");
@@ -13,8 +15,8 @@ const sendEmail = async ({ to, subject, html }) => {
     port: Number(process.env.EMAIL_PORT) || 587,
     secure: Number(process.env.EMAIL_PORT) === 465,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
+      user: emailUser,
+      pass: emailPassword
     }
   });
 

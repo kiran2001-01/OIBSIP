@@ -9,10 +9,9 @@ const LoginPage = () => {
   const [role, setRole] = useState(
     searchParams.get('role') === 'admin' ? 'admin' : 'user'
   );
-  const { login, adminLogin, resendVerification } = useAuth();
+  const { login, adminLogin } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleRoleChange = (newRole) => {
@@ -51,29 +50,6 @@ const LoginPage = () => {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    if (!formData.email) {
-      toast.error('Enter your email address first.');
-      return;
-    }
-
-    setResending(true);
-    try {
-      const response = await resendVerification(formData.email);
-      const verificationUrl = response.data?.verificationUrl;
-      if (verificationUrl) {
-        const link = new URL(verificationUrl);
-        navigate(`${link.pathname}${link.search}`);
-        return;
-      }
-      toast.success(response.message || 'Verification email sent.');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not resend verification email.');
-    } finally {
-      setResending(false);
     }
   };
 
@@ -171,16 +147,6 @@ const LoginPage = () => {
             {loading ? 'Signing in...' : role === 'admin' ? 'Admin Sign In' : 'Login'}
           </button>
 
-          {role === 'user' && (
-            <button
-              className="btn btn-link w-100 mt-2"
-              disabled={resending}
-              type="button"
-              onClick={handleResendVerification}
-            >
-              {resending ? 'Sending...' : 'Resend verification email'}
-            </button>
-          )}
         </form>
       </div>
     </div>

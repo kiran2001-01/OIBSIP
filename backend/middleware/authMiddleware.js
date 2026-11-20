@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { getAuthToken } = require("../utils/authCookie");
+const { getAuthToken, clearAuthCookie } = require("../utils/authCookie");
 
 const protect = async (req, res, next) => {
   try {
@@ -34,6 +34,7 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    clearAuthCookie(res);
     return res.status(401).json({
       success: false,
       message: "Not authorized, invalid token"

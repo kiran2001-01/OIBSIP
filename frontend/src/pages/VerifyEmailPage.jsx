@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/useAuth';
 
@@ -42,7 +42,8 @@ const VerifyEmailPage = () => {
       <div className="container py-5 text-center">
         <div className="auth-card mx-auto">
           <h2>Email verified</h2>
-          <p className="text-muted">Your account has been activated successfully.</p>
+          <p className="text-muted">Your account has been created and activated successfully.</p>
+          <Link className="btn btn-primary" to="/login">Continue to login</Link>
         </div>
       </div>
     );

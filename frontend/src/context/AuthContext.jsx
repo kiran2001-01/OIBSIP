@@ -76,7 +76,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Clear the local session even when the API is temporarily unavailable.
+      // The next request/reload can restore the server session once the API is back.
+      setUser(null);
+      return {
+        success: true,
+        message: 'Logged out on this device'
+      };
+    }
+
     setUser(null);
   };
 
