@@ -17,7 +17,8 @@ const registrationVerificationSchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
       required: true,
-      index: true
+      index: true,
+      expires: 0
     },
     verifiedAt: {
       type: Date,
