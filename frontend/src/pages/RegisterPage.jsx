@@ -1,38 +1,78 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/useAuth';
 
 const RegisterPage = () => {
-  const { register, resendVerification } = useAuth();
+  const { register, requestRegistrationVerification } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialEmail = searchParams.get('email') || '';
+  const savedEmail = localStorage.getItem('registration_verified_email');
+  const savedToken = localStorage.getItem('registration_verification_token');
+  const initiallyVerified = Boolean(savedEmail && savedToken && savedEmail === initialEmail.trim().toLowerCase());
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    email: initialEmail,
     phone: '',
     password: '',
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [verificationUrl, setVerificationUrl] = useState('');
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(initiallyVerified);
+  const [verificationToken, setVerificationToken] = useState(initiallyVerified ? savedToken : '');
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === 'email') {
+      const normalizedEmail = value.trim().toLowerCase();
+      const savedEmail = localStorage.getItem('registration_verified_email');
+      if (normalizedEmail !== savedEmail) {
+        setEmailVerified(false);
+        setVerificationToken('');
+      }
+    }
+  };
+
+  const handleVerifyEmail = async () => {
+    const email = formData.email.trim().toLowerCase();
+    if (!email) {
+      toast.error('Enter your email address first.');
+      return;
+    }
+
+    setVerifyingEmail(true);
+    try {
+      const response = await requestRegistrationVerification(email);
+      toast.info(response.message || 'Check your email for the verification link.');
+      if (response.data?.verificationUrl) {
+        window.open(response.data.verificationUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not send the verification link.');
+    } finally {
+      setVerifyingEmail(false);
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!emailVerified || !verificationToken || formData.email.trim().toLowerCase() !== localStorage.getItem('registration_verified_email')) {
+      toast.error('Complete email verification before registering.');
+      return;
+    }
+
     setLoading(true);
-
     try {
-      const response = await register(formData);
-      const localVerificationUrl = response.data?.verificationUrl;
-      setVerificationUrl(localVerificationUrl || '');
-
-      toast.info(response.message || 'Check your email to activate your account.');
-      setVerificationSent(true);
+      const response = await register({ ...formData, registrationVerificationToken: verificationToken });
+      localStorage.removeItem('registration_verified_email');
+      localStorage.removeItem('registration_verification_token');
+      toast.success(response.message || 'Registration successful. You can now log in.');
+      setEmailVerified(false);
+      setVerificationToken('');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Registration failed');
     } finally {
@@ -40,112 +80,47 @@ const RegisterPage = () => {
     }
   };
 
-  const handleResendVerification = async () => {
-    setResending(true);
-    try {
-      const response = await resendVerification(formData.email.trim());
-      setVerificationUrl(response.data?.verificationUrl || '');
-      toast.success(response.message || 'Verification email sent.');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not resend verification email.');
-    } finally {
-      setResending(false);
-    }
-  };
-
   return (
     <div className="auth-page">
       <div className="auth-card">
         <h2 className="mb-3">Create account</h2>
-        <p className="text-muted mb-4">Join us and start ordering your favorite pizza.</p>
+        <p className="text-muted mb-4">Verify your email first, then complete the registration form.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label className="form-label">Full name</label>
-            <input
-              type="text"
-              name="name"
-              className="form-control"
-              value={formData.name}
-              onChange={handleChange}
-              required
-            />
+            <input type="text" name="name" className="form-control" value={formData.name} onChange={handleChange} required />
           </div>
 
           <div className="mb-3">
             <label className="form-label">Email</label>
-            <input
-              type="email"
-              name="email"
-              className="form-control"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-            <div className="form-text">
-              An email verification link will be sent here after registration.
-            </div>
-          </div>
-
-          {verificationSent && (
-            <div className="alert alert-success" role="status">
-              <strong>Verification pending:</strong> We sent a verification link to {formData.email}. Your account will be activated only after you verify your email.
-              <button className="btn btn-sm btn-outline-success d-block mt-2" type="button" onClick={handleResendVerification} disabled={resending}>
-                {resending ? 'Sending...' : 'Resend verification link'}
+            <div className="input-group">
+              <input type="email" name="email" className="form-control" value={formData.email} onChange={handleChange} required />
+              <button className="btn btn-outline-primary" type="button" onClick={handleVerifyEmail} disabled={verifyingEmail || emailVerified}>
+                {emailVerified ? 'Email verified' : verifyingEmail ? 'Sending...' : 'Verify email'}
               </button>
-              {verificationUrl && (
-                <a className="btn btn-sm btn-link d-block text-start px-0" href={verificationUrl}>
-                  Open local verification link
-                </a>
-              )}
             </div>
-          )}
+            <div className="form-text">A verification link will be sent to this email. Your account is not created until you verify it.</div>
+          </div>
 
           <div className="mb-3">
             <label className="form-label">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              className="form-control"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-            />
+            <input type="tel" name="phone" className="form-control" value={formData.phone} onChange={handleChange} required />
           </div>
 
           <div className="mb-3">
             <label className="form-label">Password</label>
-            <input
-              type="password"
-              name="password"
-              className="form-control"
-              minLength={10}
-              maxLength={72}
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-            <div className="form-text">
-              Use at least 10 characters with an uppercase letter, a lowercase letter, and a number.
-            </div>
+            <input type="password" name="password" className="form-control" minLength={10} maxLength={72} value={formData.password} onChange={handleChange} required />
+            <div className="form-text">Use at least 10 characters with an uppercase letter, a lowercase letter, and a number.</div>
           </div>
 
           <div className="mb-3">
             <label className="form-label">Confirm password</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              className="form-control"
-              minLength={10}
-              maxLength={72}
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-            />
+            <input type="password" name="confirmPassword" className="form-control" minLength={10} maxLength={72} value={formData.confirmPassword} onChange={handleChange} required />
           </div>
 
-          <button className="btn btn-primary w-100" type="submit" disabled={loading || verificationSent}>
-            {loading ? 'Registering...' : verificationSent ? 'Verification pending' : 'Register'}
+          <button className="btn btn-primary w-100" type="submit" disabled={loading}>
+            {loading ? 'Creating account...' : 'Register'}
           </button>
 
           <div className="mt-3 text-center small">

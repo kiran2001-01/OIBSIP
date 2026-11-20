@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
+const RegistrationVerification = require("../models/RegistrationVerification");
 const { generateToken } = require("../utils/generateToken");
 const {
   setAuthCookie,
@@ -70,6 +71,94 @@ const sendVerificationEmail = async (user) => {
   return emailResult.skipped ? verifyLink : null;
 };
 
+const sendRegistrationVerificationEmail = async (email, token) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const verifyLink = `${frontendUrl}/verify-email?mode=registration&email=${encodeURIComponent(email)}&token=${token}`;
+
+  const emailResult = await sendEmail({
+    to: email,
+    subject: "Verify your Pizza Delivery email",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Verify your email</h2>
+        <p>Click the link below to verify your email before creating your Pizza Delivery account.</p>
+        <p><a href="${verifyLink}" target="_blank">Verify email and continue registration</a></p>
+        <p style="font-size: 13px; word-break: break-all;">${verifyLink}</p>
+      </div>
+    `
+  });
+
+  if (emailResult.skipped && !isLocalEmailFallbackEnabled()) {
+    throw new Error("Email delivery is not configured");
+  }
+
+  return emailResult.skipped ? verifyLink : null;
+};
+
+const requestRegistrationVerification = async (req, res) => {
+  try {
+    const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ success: false, message: "Please provide a valid email" });
+    }
+
+    if (!isEmailConfigured() && !isLocalEmailFallbackEnabled()) {
+      return res.status(503).json({
+        success: false,
+        message: "Email delivery is not configured on the server"
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser?.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "A user with this email already exists"
+      });
+    }
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "This email has an unfinished registration. Use the existing verification email or remove the unverified test account first."
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    await RegistrationVerification.deleteMany({ email });
+    await RegistrationVerification.create({
+      email,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+    });
+
+    try {
+      const verificationUrl = await sendRegistrationVerificationEmail(email, token);
+      return res.status(202).json({
+        success: true,
+        message: verificationUrl
+          ? "Verification link created. Open it, then return here to complete registration."
+          : "Verification link sent. Open it, then return here to complete registration.",
+        data: {
+          email,
+          ...(verificationUrl && { verificationUrl })
+        }
+      });
+    } catch (error) {
+      await RegistrationVerification.deleteOne({ email, tokenHash: hashToken(token) });
+      throw error;
+    }
+  } catch (error) {
+    return sendControllerError(
+      res,
+      error,
+      "Registration verification failed",
+      "Could not send the verification link"
+    );
+  }
+};
+
 const registerUser = async (req, res) => {
   const errors = validationResult(req);
 
@@ -81,7 +170,7 @@ const registerUser = async (req, res) => {
   }
 
   try {
-    const { name, email, phone, password, confirmPassword } = req.body;
+    const { name, email, phone, password, confirmPassword, registrationVerificationToken } = req.body;
 
     if (!name || !email || !phone || !password || !confirmPassword) {
       return res.status(400).json({
@@ -101,13 +190,6 @@ const registerUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: PASSWORD_POLICY_MESSAGE
-      });
-    }
-
-    if (!isEmailConfigured() && !isLocalEmailFallbackEnabled()) {
-      return res.status(503).json({
-        success: false,
-        message: "Email delivery is not configured on the server"
       });
     }
 
@@ -133,25 +215,43 @@ const registerUser = async (req, res) => {
       });
     }
 
+    if (!registrationVerificationToken) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email before completing registration"
+      });
+    }
+
+    const verifiedRegistration = await RegistrationVerification.findOne({
+      email: email.toLowerCase(),
+      tokenHash: hashToken(registrationVerificationToken),
+      verifiedAt: { $ne: null },
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!verifiedRegistration) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email before completing registration"
+      });
+    }
+
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       phone,
       password,
       role: "user",
-      emailVerified: false
+      emailVerified: true
     });
 
-    const verificationUrl = await sendVerificationEmail(user);
+    await RegistrationVerification.deleteOne({ _id: verifiedRegistration._id });
 
-    return res.status(202).json({
+    return res.status(201).json({
       success: true,
-      message: verificationUrl
-        ? "Registration pending. Verify your email using the local development link to activate your account."
-        : "Registration pending. Please check your email to verify and activate your account.",
+      message: "Registration successful. You can now log in.",
       data: {
-        user: user.toJSON(),
-        ...(verificationUrl && { verificationUrl })
+        user: user.toJSON()
       }
     });
   } catch (error) {
@@ -246,6 +346,34 @@ const verifyEmail = async (req, res) => {
       emailVerificationToken: hashedToken,
       emailVerificationExpires: { $gt: Date.now() }
     });
+
+    if (!user && req.query.mode === "registration") {
+      const pending = await RegistrationVerification.findOne({
+        email: typeof req.query.email === "string" ? req.query.email.toLowerCase() : "",
+        tokenHash: hashedToken,
+        expiresAt: { $gt: Date.now() }
+      });
+
+      if (!pending) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid or expired verification token"
+        });
+      }
+
+      pending.verifiedAt = new Date();
+      await pending.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Email verified. Return to the registration form to create your account.",
+        data: {
+          registrationVerified: true,
+          email: pending.email,
+          registrationVerificationToken: token
+        }
+      });
+    }
 
     if (!user) {
       return res.status(400).json({
@@ -615,6 +743,7 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = {
+  requestRegistrationVerification,
   registerUser,
   loginUser,
   adminLoginUser,

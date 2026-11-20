@@ -50,6 +50,11 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  const requestRegistrationVerification = async (email) => {
+    const response = await api.post('/auth/request-registration-verification', { email });
+    return response.data;
+  };
+
   const verifyEmail = async (tokenValue) => {
     const response = await api.get(`/auth/verify-email?token=${tokenValue}`);
     return response.data;
@@ -98,6 +103,7 @@ export const AuthProvider = ({ children }) => {
       login,
       adminLogin,
       register,
+      requestRegistrationVerification,
       verifyEmail,
       resendVerification,
       forgotPassword,

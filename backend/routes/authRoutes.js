@@ -13,6 +13,7 @@ const {
 } = require("../utils/passwordPolicy");
 const {
   registerUser,
+  requestRegistrationVerification,
   loginUser,
   adminLoginUser,
   getCurrentUser,
@@ -33,6 +34,12 @@ router.get("/health", (req, res) => {
     message: "Auth routes ready"
   });
 });
+
+router.post(
+  "/request-registration-verification",
+  emailActionRateLimiter,
+  requestRegistrationVerification
+);
 
 router.post(
   "/register",
