@@ -113,6 +113,20 @@ const registerUser = async (req, res) => {
 
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
+      if (!userExists.emailVerified) {
+        const verificationUrl = await sendVerificationEmail(userExists);
+
+        return res.status(202).json({
+          success: true,
+          message: verificationUrl
+            ? "This email is already registered but not verified. Use the local development link to verify it."
+            : "This email is already registered but not verified. A new verification email has been sent.",
+          data: {
+            ...(verificationUrl && { verificationUrl })
+          }
+        });
+      }
+
       return res.status(400).json({
         success: false,
         message: "A user with this email already exists"
