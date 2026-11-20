@@ -19,9 +19,11 @@ const {
 
 const isLocalEmailFallbackEnabled = () => process.env.NODE_ENV === "development";
 const isEmailConfigured = () => Boolean(
-  process.env.EMAIL_HOST?.trim()
-  && process.env.EMAIL_USER?.trim()
-  && process.env.EMAIL_PASSWORD?.trim()
+  (process.env.RESEND_API_KEY?.trim()
+    && (process.env.RESEND_FROM?.trim() || process.env.EMAIL_FROM?.trim()))
+  || (process.env.EMAIL_HOST?.trim()
+    && process.env.EMAIL_USER?.trim()
+    && process.env.EMAIL_PASSWORD?.trim())
 );
 const passwordResetRequestMessage = "If an account exists for this email, a reset code has been sent.";
 
