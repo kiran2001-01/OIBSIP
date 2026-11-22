@@ -8,6 +8,8 @@ const VerifyEmailPage = () => {
   const { verifyEmail } = useAuth();
   const token = searchParams.get('token');
   const isRegistrationVerification = searchParams.get('mode') === 'registration';
+  const verificationMode = isRegistrationVerification ? 'registration' : undefined;
+  const registrationEmail = isRegistrationVerification ? searchParams.get('email') : undefined;
   const [status, setStatus] = useState(token ? 'verifying' : 'invalid');
   const verificationStarted = useRef(false);
 
@@ -22,7 +24,10 @@ const VerifyEmailPage = () => {
 
     const verify = async () => {
       try {
-        const response = await verifyEmail(token);
+        const response = await verifyEmail(token, {
+          mode: verificationMode,
+          email: registrationEmail
+        });
         if (response.data?.registrationVerified) {
           localStorage.setItem('registration_verified_email', response.data.email);
           localStorage.setItem('registration_verification_token', response.data.registrationVerificationToken);
@@ -36,7 +41,7 @@ const VerifyEmailPage = () => {
     };
 
     verify();
-  }, [token, verifyEmail]);
+  }, [registrationEmail, token, verificationMode, verifyEmail]);
 
   if (status === 'verifying') {
     return <div className="container py-5 text-center">Verifying your email...</div>;

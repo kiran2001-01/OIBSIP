@@ -55,8 +55,18 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
-  const verifyEmail = async (tokenValue) => {
-    const response = await api.get(`/auth/verify-email?token=${tokenValue}`);
+  const verifyEmail = async (tokenValue, verificationDetails = {}) => {
+    const params = new URLSearchParams({ token: tokenValue });
+
+    if (verificationDetails.mode) {
+      params.set('mode', verificationDetails.mode);
+    }
+
+    if (verificationDetails.email) {
+      params.set('email', verificationDetails.email);
+    }
+
+    const response = await api.get(`/auth/verify-email?${params.toString()}`);
     return response.data;
   };
 
