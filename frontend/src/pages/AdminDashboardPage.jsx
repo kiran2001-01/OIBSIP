@@ -66,8 +66,6 @@ const AdminDashboardPage = () => {
   const [recipe, setRecipe] = useState([]);
   const [pizzaForm, setPizzaForm] = useState(emptyPizzaForm);
   const [editingPizzaId, setEditingPizzaId] = useState('');
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [imageFileName, setImageFileName] = useState('');
   const [ingredientForm, setIngredientForm] = useState({
     name: '',
     category: 'other',
@@ -261,43 +259,10 @@ const AdminDashboardPage = () => {
         setRecipe([]);
       }
       setPizzaForm(emptyPizzaForm);
-      setImageFileName('');
       setEditingPizzaId('');
       toast.success(editingPizzaId ? 'Pizza updated.' : 'Pizza added to the menu.');
     } catch (requestError) {
       toast.error(requestError.response?.data?.message || 'Could not save pizza.');
-    }
-  };
-
-  const handlePizzaImageChange = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file.');
-      event.target.value = '';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5 MB.');
-      event.target.value = '';
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const response = await api.post('/pizzas/upload-image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setPizzaForm((current) => ({ ...current, image: response.data.data.image }));
-      setImageFileName(file.name);
-      toast.success('Image uploaded. Save the pizza to use it.');
-    } catch (requestError) {
-      toast.error(requestError.response?.data?.message || 'Could not upload image.');
-    } finally {
-      setUploadingImage(false);
-      event.target.value = '';
     }
   };
 
@@ -313,7 +278,6 @@ const AdminDashboardPage = () => {
       if (editingPizzaId === pizza._id) {
         setEditingPizzaId('');
         setPizzaForm(emptyPizzaForm);
-        setImageFileName('');
       }
       toast.success('Pizza deleted.');
     } catch (requestError) {
@@ -619,18 +583,12 @@ const AdminDashboardPage = () => {
               required maxLength={500} />
           </div>
           <div className="col-md-6">
-            <label className="form-label" htmlFor="pizza-image">Product picture</label>
-            <input id="pizza-image" type="file" accept="image/*" className="visually-hidden"
-              onChange={handlePizzaImageChange} disabled={uploadingImage} />
-            <div className="admin-image-upload">
-              <label htmlFor="pizza-image" className="btn btn-outline-primary">
-                {uploadingImage ? 'Uploading image...' : 'Choose image'}
-              </label>
-              <div className="small text-muted text-truncate">
-                {imageFileName || (pizzaForm.image ? 'Current image selected' : 'No image selected')}
-              </div>
-            </div>
-            <div className="form-text">Choose an image from your computer. Maximum size: 5 MB.</div>
+            <label className="form-label" htmlFor="pizza-image">Product image URL</label>
+            <input id="pizza-image" type="url" className="form-control"
+              value={pizzaForm.image}
+              onChange={(event) => setPizzaForm({ ...pizzaForm, image: event.target.value })}
+              placeholder="https://example.com/spinach-pizza.jpg" />
+            <div className="form-text">Paste a direct public image URL. Use an image link, not a webpage link.</div>
             {pizzaForm.image && (
               <img className="admin-pizza-preview mt-2" src={getImageUrl(pizzaForm.image)} alt="Selected pizza preview" />
             )}
@@ -650,14 +608,13 @@ const AdminDashboardPage = () => {
             </div>
           </div>
           <div className="col-12 d-flex gap-2">
-            <button type="submit" className="btn btn-primary" disabled={uploadingImage}>
+            <button type="submit" className="btn btn-primary">
               {editingPizzaId ? 'Save pizza' : 'Add pizza'}
             </button>
             {editingPizzaId && (
               <button type="button" className="btn btn-outline-secondary" onClick={() => {
                 setEditingPizzaId('');
                 setPizzaForm(emptyPizzaForm);
-                setImageFileName('');
               }}>Stop editing</button>
             )}
           </div>
